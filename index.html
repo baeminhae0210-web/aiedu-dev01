@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>토론 의견 수집</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: #F5F5F5;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* ── 헤더 ── */
+    .app-header {
+      background: linear-gradient(135deg, #FF8C00, #FFB347);
+      color: white;
+      padding: 18px 20px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 10px rgba(255,140,0,0.35);
+    }
+    .app-header h1  { font-size: 1.25rem; font-weight: 900; }
+    .app-header .subtitle { font-size: 0.82rem; opacity: 0.92; margin-top: 3px; }
+
+    /* ── 레이아웃 ── */
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 16px 14px 48px;
+    }
+
+    /* ── 화면 전환 ── */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── 카드 ── */
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 22px 20px;
+      margin: 14px 0;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    }
+
+    /* ── 폼 요소 ── */
+    .form-group { margin-bottom: 18px; }
+
+    label {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #555;
+      margin-bottom: 7px;
+    }
+
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 11px 13px;
+      border: 2px solid #E8E8E8;
+      border-radius: 10px;
+      font-size: 0.98rem;
+      font-family: 'Noto Sans KR', sans-serif;
+      transition: border-color 0.2s;
+      outline: none;
+      background: #FAFAFA;
+    }
+    input[type="text"]:focus,
+    textarea:focus { border-color: #FF8C00; background: white; }
+    textarea { resize: vertical; min-height: 78px; line-height: 1.6; }
+
+    /* ── 버튼 ── */
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      font-family: 'Noto Sans KR', sans-serif;
+      cursor: pointer;
+      transition: all 0.18s;
+      text-align: center;
+    }
+    .btn + .btn { margin-top: 10px; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #FF8C00, #FFB347);
+      color: white;
+      box-shadow: 0 4px 12px rgba(255,140,0,0.28);
+    }
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(255,140,0,0.38);
+    }
+    .btn-primary:disabled { opacity: 0.48; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: white;
+      color: #FF8C00;
+      border: 2px solid #FF8C00;
+    }
+    .btn-secondary:hover { background: #FFF5E6; }
+
+    /* ── 학교급 선택 ── */
+    .level-selector { display: flex; gap: 8px; }
+    .level-btn {
+      flex: 1;
+      padding: 10px 6px;
+      border: 2px solid #E8E8E8;
+      border-radius: 10px;
+      background: white;
+      font-size: 0.92rem;
+      font-weight: 500;
+      font-family: 'Noto Sans KR', sans-serif;
+      cursor: pointer;
+      transition: all 0.18s;
+      text-align: center;
+      color: #777;
+    }
+    .level-btn.selected {
+      border-color: #FF8C00;
+      background: #FFF5E6;
+      color: #FF8C00;
+      font-weight: 700;
+    }
+
+    /* ── 입장 선택 ── */
+    .stance-selector { display: flex; gap: 8px; }
+    .stance-btn {
+      flex: 1;
+      padding: 12px 6px;
+      border: 2px solid #E8E8E8;
+      border-radius: 10px;
+      background: white;
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: 'Noto Sans KR', sans-serif;
+      cursor: pointer;
+      transition: all 0.18s;
+      text-align: center;
+    }
+    .stance-btn[data-stance="찬성"]          { color: #2E7D32; }
+    .stance-btn[data-stance="찬성"].selected  { background: #43A047; border-color: #43A047; color: white; }
+    .stance-btn[data-stance="반대"]          { color: #C62828; }
+    .stance-btn[data-stance="반대"].selected  { background: #E53935; border-color: #E53935; color: white; }
+    .stance-btn[data-stance="중립"]          { color: #555; }
+    .stance-btn[data-stance="중립"].selected  { background: #757575; border-color: #757575; color: white; }
+
+    /* ── 주제 표시 ── */
+    .topic-display {
+      background: linear-gradient(135deg, #FFF8ED, #FFF);
+      border: 2px solid #FFD180;
+      border-radius: 12px;
+      padding: 13px 15px;
+      margin-bottom: 18px;
+    }
+    .topic-display .tag  { font-size: 0.75rem; color: #FF8C00; font-weight: 700; margin-bottom: 3px; }
+    .topic-display .text { font-size: 1.02rem; font-weight: 700; color: #333; }
+
+    /* ── 성공 메시지 ── */
+    .success-msg {
+      display: none;
+      background: #E8F5E9;
+      border: 2px solid #66BB6A;
+      border-radius: 14px;
+      padding: 28px 20px;
+      text-align: center;
+      margin: 14px 0;
+    }
+    .success-msg.show { display: block; }
+    .success-msg .icon { font-size: 2.8rem; margin-bottom: 10px; }
+    .success-msg h3 { color: #2E7D32; font-size: 1.1rem; margin-bottom: 5px; }
+    .success-msg p  { color: #555; font-size: 0.88rem; }
+
+    /* ── 로딩 스피너 ── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 오류 메시지 ── */
+    .error-msg {
+      display: none;
+      background: #FFEBEE;
+      border: 1px solid #FFCDD2;
+      border-radius: 8px;
+      padding: 11px 13px;
+      color: #B71C1C;
+      font-size: 0.86rem;
+      margin-top: 8px;
+    }
+    .error-msg.show { display: block; }
+
+    /* ── 뒤로가기 행 ── */
+    .back-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .back-btn {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #FF8C00;
+      line-height: 1;
+      padding: 2px 4px;
+    }
+    .back-row h2 { font-size: 1.08rem; font-weight: 700; color: #333; }
+
+    /* ── 통계 카드 ── */
+    .stats-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .stat-card {
+      flex: 1;
+      background: white;
+      border-radius: 12px;
+      padding: 13px 8px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .stat-card .num   { font-size: 1.7rem; font-weight: 900; }
+    .stat-card .lbl   { font-size: 0.72rem; color: #888; margin-top: 1px; }
+    .stat-card.total  .num { color: #FF8C00; }
+    .stat-card.pro    .num { color: #43A047; }
+    .stat-card.con    .num { color: #E53935; }
+    .stat-card.neutral .num { color: #757575; }
+
+    /* ── 비율 바 ── */
+    .ratio-card {
+      background: white;
+      border-radius: 12px;
+      padding: 13px 15px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .ratio-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.8rem;
+      color: #888;
+    }
+    .pbar {
+      display: flex;
+      height: 10px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #F0F0F0;
+    }
+    .pbar-pro     { background: #43A047; transition: width 0.4s; }
+    .pbar-con     { background: #E53935; transition: width 0.4s; }
+    .pbar-neutral { background: #9E9E9E; transition: width 0.4s; }
+
+    .refresh-btn {
+      background: none;
+      border: 1px solid #E0E0E0;
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-family: 'Noto Sans KR', sans-serif;
+      cursor: pointer;
+      color: #666;
+    }
+    .refresh-btn:hover { background: #F5F5F5; }
+
+    /* ── 필터 버튼 ── */
+    .filter-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filter-btn {
+      padding: 7px 15px;
+      border: 2px solid #E8E8E8;
+      border-radius: 20px;
+      background: white;
+      font-size: 0.85rem;
+      font-weight: 500;
+      font-family: 'Noto Sans KR', sans-serif;
+      cursor: pointer;
+      transition: all 0.18s;
+      color: #666;
+    }
+    .filter-btn.active              { border-color: #FF8C00; background: #FF8C00; color: white; }
+    .filter-btn.active[data-f="찬성"]  { border-color: #43A047; background: #43A047; }
+    .filter-btn.active[data-f="반대"]  { border-color: #E53935; background: #E53935; }
+    .filter-btn.active[data-f="중립"]  { border-color: #757575; background: #757575; }
+
+    /* ── 의견 카드 ── */
+    .opinion-card {
+      background: white;
+      border-radius: 12px;
+      padding: 15px 15px 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      border-left: 5px solid #E0E0E0;
+    }
+    .opinion-card.pro     { border-left-color: #43A047; }
+    .opinion-card.con     { border-left-color: #E53935; }
+    .opinion-card.neutral { border-left-color: #9E9E9E; }
+
+    .opinion-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .opinion-name { font-weight: 700; font-size: 0.93rem; }
+
+    .stance-badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: white;
+    }
+    .stance-badge.pro     { background: #43A047; }
+    .stance-badge.con     { background: #E53935; }
+    .stance-badge.neutral { background: #9E9E9E; }
+
+    .opinion-topic { font-size: 0.78rem; color: #AAA; margin-bottom: 10px; }
+
+    .ofield        { margin-bottom: 8px; }
+    .ofield-label  { font-size: 0.73rem; color: #FF8C00; font-weight: 700; margin-bottom: 2px; }
+    .ofield-value  { font-size: 0.9rem; color: #444; line-height: 1.55; }
+
+    .opinion-time { font-size: 0.73rem; color: #C0C0C0; margin-top: 8px; }
+
+    /* ── 빈 상태 ── */
+    .empty-state { text-align: center; padding: 44px 20px; color: #BDBDBD; }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state p { font-size: 0.9rem; }
+
+    /* ── 섹션 제목 ── */
+    .section-title { font-size: 1.1rem; font-weight: 700; color: #333; margin-bottom: 3px; }
+    .section-desc  { font-size: 0.83rem; color: #999; margin-bottom: 18px; }
+  </style>
+</head>
+<body>
+
+<div class="app-header">
+  <h1>💬 토론 의견 수집</h1>
+  <div class="subtitle" id="headerSub">교사용 설정</div>
+</div>
+
+<div class="container">
+
+  <!-- ════════════════════════════════
+       화면 1 : 설정 (교사용)
+       ════════════════════════════════ -->
+  <div class="screen active" id="screen-setup">
+    <div class="card">
+      <div class="section-title">수업 설정</div>
+      <div class="section-desc">토론 주제와 학교급을 설정해 주세요</div>
+
+      <div class="form-group">
+        <label for="topicInput">토론 주제</label>
+        <input type="text" id="topicInput"
+               placeholder="예) 스마트폰 사용을 규제해야 한다"
+               oninput="onTopicInput()" />
+      </div>
+
+      <div class="form-group">
+        <label>학교급</label>
+        <div class="level-selector">
+          <button class="level-btn" data-level="초등" onclick="selectLevel('초등')">초등</button>
+          <button class="level-btn selected" data-level="중등" onclick="selectLevel('중등')">중등</button>
+          <button class="level-btn" data-level="고등" onclick="selectLevel('고등')">고등</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="startBtn" onclick="startDebate()" disabled>
+        토론 시작하기 →
+      </button>
+      <button class="btn btn-secondary" onclick="goToView()">
+        전체 의견 조회
+      </button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════
+       화면 2 : 학생 입력
+       ════════════════════════════════ -->
+  <div class="screen" id="screen-student">
+    <div class="back-row">
+      <button class="back-btn" onclick="goToSetup()">←</button>
+      <h2>의견 입력</h2>
+    </div>
+
+    <div class="topic-display">
+      <div class="tag">오늘의 토론 주제</div>
+      <div class="text" id="topicDisplay"></div>
+    </div>
+
+    <!-- 제출 완료 메시지 -->
+    <div class="success-msg" id="successMsg">
+      <div class="icon">✅</div>
+      <h3>의견이 제출되었어요!</h3>
+      <p>선생님이 모든 의견을 확인할 거예요</p>
+    </div>
+
+    <!-- 입력 폼 -->
+    <div id="studentForm">
+      <div class="card">
+        <div class="form-group">
+          <label for="studentName">이름</label>
+          <input type="text" id="studentName" placeholder="이름을 입력하세요" oninput="checkReady()" />
+        </div>
+
+        <div class="form-group">
+          <label id="lStance">나의 입장</label>
+          <div class="stance-selector">
+            <button class="stance-btn" data-stance="찬성" onclick="selectStance(this)">👍 찬성</button>
+            <button class="stance-btn" data-stance="반대" onclick="selectStance(this)">👎 반대</button>
+            <button class="stance-btn" data-stance="중립" onclick="selectStance(this)">🤝 중립</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label id="lReason">그렇게 생각한 이유</label>
+          <textarea id="reasonInput" placeholder="이유를 적어 보세요" oninput="checkReady()"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label id="lEvidence">구체적인 근거나 예시</label>
+          <textarea id="evidenceInput" placeholder="근거나 예시를 적어 보세요"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label id="lCounter">반대 의견에 대한 생각</label>
+          <textarea id="counterInput" placeholder="다른 관점에서 생각해 보세요"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label id="lLearned">토론 후 생각이 바뀐 점</label>
+          <textarea id="learnedInput" placeholder="새롭게 알게 된 것이나 생각이 바뀐 점을 적어 보세요"></textarea>
+        </div>
+
+        <div class="error-msg" id="submitError"></div>
+
+        <button class="btn btn-primary" id="submitBtn" onclick="submitOpinion()" disabled>
+          의견 제출하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════
+       화면 3 : 전체 조회 (교사용)
+       ════════════════════════════════ -->
+  <div class="screen" id="screen-view">
+    <div class="back-row">
+      <button class="back-btn" onclick="goToSetup()">←</button>
+      <h2>전체 의견 조회</h2>
+    </div>
+
+    <!-- 통계 -->
+    <div class="stats-row">
+      <div class="stat-card total">
+        <div class="num" id="sTotal">0</div>
+        <div class="lbl">전체</div>
+      </div>
+      <div class="stat-card pro">
+        <div class="num" id="sPro">0</div>
+        <div class="lbl">찬성</div>
+      </div>
+      <div class="stat-card con">
+        <div class="num" id="sCon">0</div>
+        <div class="lbl">반대</div>
+      </div>
+      <div class="stat-card neutral">
+        <div class="num" id="sNeutral">0</div>
+        <div class="lbl">중립</div>
+      </div>
+    </div>
+
+    <!-- 비율 바 -->
+    <div class="ratio-card">
+      <div class="ratio-header">
+        <span id="ratioText">의견을 불러오는 중...</span>
+        <button class="refresh-btn" onclick="loadOpinions()">🔄 새로고침</button>
+      </div>
+      <div class="pbar">
+        <div class="pbar-pro"     id="pbPro"     style="width:0%"></div>
+        <div class="pbar-con"     id="pbCon"     style="width:0%"></div>
+        <div class="pbar-neutral" id="pbNeutral" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- 필터 -->
+    <div class="filter-row">
+      <button class="filter-btn active" data-f="전체" onclick="setFilter(this)">전체</button>
+      <button class="filter-btn"        data-f="찬성" onclick="setFilter(this)">👍 찬성</button>
+      <button class="filter-btn"        data-f="반대" onclick="setFilter(this)">👎 반대</button>
+      <button class="filter-btn"        data-f="중립" onclick="setFilter(this)">🤝 중립</button>
+    </div>
+
+    <!-- 의견 목록 -->
+    <div id="opinionsList"></div>
+    <div class="error-msg" id="loadError"></div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+  // ────────────────────────────────────────
+  // 전역 상태
+  // ────────────────────────────────────────
+  let currentLevel  = '중등';   // 중학교 1학년 기본값
+  let currentTopic  = '';
+  let selectedStance = '';
+  let currentFilter = '전체';
+  let allOpinions   = [];
+
+  // Supabase 클라이언트
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // 학교급별 입력 항목 라벨
+  const LABELS = {
+    '초등': {
+      stance:   '나는 어떻게 생각해요?',
+      reason:   '왜 그렇게 생각했나요?',
+      evidence: '어떤 예를 들 수 있나요?',
+      counter:  '다른 생각도 있나요?',
+      learned:  '오늘 새로 알게 된 것',
+    },
+    '중등': {
+      stance:   '나의 입장',
+      reason:   '그렇게 생각한 이유',
+      evidence: '구체적인 근거나 예시',
+      counter:  '반대 의견에 대한 생각',
+      learned:  '토론 후 생각이 바뀐 점',
+    },
+    '고등': {
+      stance:   '주장',
+      reason:   '주장의 근거',
+      evidence: '논거 및 자료',
+      counter:  '반론 및 재반박',
+      learned:  '관점 변화',
+    },
+  };
+
+  // ────────────────────────────────────────
+  // 화면 전환
+  // ────────────────────────────────────────
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function goToSetup() {
+    document.getElementById('headerSub').textContent = '교사용 설정';
+    showScreen('setup');
+  }
+
+  function goToView() {
+    document.getElementById('headerSub').textContent = '전체 의견 조회';
+    showScreen('view');
+    loadOpinions();
+  }
+
+  // ────────────────────────────────────────
+  // 설정 화면
+  // ────────────────────────────────────────
+  function selectLevel(level) {
+    currentLevel = level;
+    document.querySelectorAll('.level-btn').forEach(btn => {
+      btn.classList.toggle('selected', btn.dataset.level === level);
+    });
+  }
+
+  function onTopicInput() {
+    const val = document.getElementById('topicInput').value.trim();
+    document.getElementById('startBtn').disabled = !val;
+  }
+
+  function startDebate() {
+    const topic = document.getElementById('topicInput').value.trim();
+    if (!topic) return;
+
+    currentTopic = topic;
+    document.getElementById('topicDisplay').textContent = topic;
+    document.getElementById('headerSub').textContent    = currentLevel + ' · ' + topic;
+
+    // 학교급에 맞는 라벨 적용
+    const L = LABELS[currentLevel];
+    document.getElementById('lStance').textContent   = L.stance;
+    document.getElementById('lReason').textContent   = L.reason;
+    document.getElementById('lEvidence').textContent = L.evidence;
+    document.getElementById('lCounter').textContent  = L.counter;
+    document.getElementById('lLearned').textContent  = L.learned;
+
+    // 플레이스홀더도 라벨에 맞게 조정
+    document.getElementById('reasonInput').placeholder   = L.reason + '를 적어 보세요';
+    document.getElementById('evidenceInput').placeholder = L.evidence + '를 적어 보세요';
+    document.getElementById('counterInput').placeholder  = L.counter + '을 적어 보세요';
+    document.getElementById('learnedInput').placeholder  = L.learned + '을 적어 보세요';
+
+    resetStudentForm();
+    showScreen('student');
+  }
+
+  // ────────────────────────────────────────
+  // 학생 입력 화면
+  // ────────────────────────────────────────
+  function selectStance(btn) {
+    selectedStance = btn.dataset.stance;
+    document.querySelectorAll('.stance-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    checkReady();
+  }
+
+  function checkReady() {
+    const name   = document.getElementById('studentName').value.trim();
+    const reason = document.getElementById('reasonInput').value.trim();
+    document.getElementById('submitBtn').disabled = !(name && selectedStance && reason);
+  }
+
+  function resetStudentForm() {
+    ['studentName','reasonInput','evidenceInput','counterInput','learnedInput']
+      .forEach(id => { document.getElementById(id).value = ''; });
+    selectedStance = '';
+    document.querySelectorAll('.stance-btn').forEach(b => b.classList.remove('selected'));
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('successMsg').classList.remove('show');
+    document.getElementById('studentForm').style.display = 'block';
+    document.getElementById('submitError').classList.remove('show');
+  }
+
+  async function submitOpinion() {
+    const name     = document.getElementById('studentName').value.trim();
+    const reason   = document.getElementById('reasonInput').value.trim();
+    const evidence = document.getElementById('evidenceInput').value.trim() || null;
+    const counter  = document.getElementById('counterInput').value.trim()  || null;
+    const learned  = document.getElementById('learnedInput').value.trim()  || null;
+
+    const submitBtn = document.getElementById('submitBtn');
+    const errEl     = document.getElementById('submitError');
+
+    // 로딩 상태
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner"></span>제출 중...';
+    errEl.classList.remove('show');
+
+    try {
+      const { error } = await sb.from('debate_records').insert([{
+        topic: currentTopic,
+        school_level: currentLevel,
+        student_name: name,
+        stance: selectedStance,
+        reason,
+        evidence,
+        counter,
+        learned,
+      }]);
+
+      if (error) throw error;
+
+      // 성공
+      document.getElementById('studentForm').style.display = 'none';
+      document.getElementById('successMsg').classList.add('show');
+
+      // 3초 후 다음 학생이 입력할 수 있도록 폼 초기화
+      setTimeout(resetStudentForm, 3000);
+
+    } catch (err) {
+      console.error('제출 오류:', err);
+      errEl.textContent = '제출에 실패했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.';
+      errEl.classList.add('show');
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '의견 제출하기';
+      checkReady();
+    }
+  }
+
+  // ────────────────────────────────────────
+  // 조회 화면
+  // ────────────────────────────────────────
+  async function loadOpinions() {
+    const listEl = document.getElementById('opinionsList');
+    const errEl  = document.getElementById('loadError');
+
+    listEl.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>불러오는 중...</p></div>';
+    errEl.classList.remove('show');
+
+    try {
+      const { data, error } = await sb
+        .from('debate_records')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      allOpinions = data || [];
+      updateStats();
+      renderOpinions();
+
+    } catch (err) {
+      console.error('조회 오류:', err);
+      listEl.innerHTML = '';
+      errEl.textContent = '데이터를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.';
+      errEl.classList.add('show');
+    }
+  }
+
+  function updateStats() {
+    const total   = allOpinions.length;
+    const pro     = allOpinions.filter(o => o.stance === '찬성').length;
+    const con     = allOpinions.filter(o => o.stance === '반대').length;
+    const neutral = allOpinions.filter(o => o.stance === '중립').length;
+
+    document.getElementById('sTotal').textContent   = total;
+    document.getElementById('sPro').textContent     = pro;
+    document.getElementById('sCon').textContent     = con;
+    document.getElementById('sNeutral').textContent = neutral;
+
+    if (total > 0) {
+      const pPro     = pro     / total * 100;
+      const pCon     = con     / total * 100;
+      const pNeutral = neutral / total * 100;
+      document.getElementById('pbPro').style.width     = pPro     + '%';
+      document.getElementById('pbCon').style.width     = pCon     + '%';
+      document.getElementById('pbNeutral').style.width = pNeutral + '%';
+      document.getElementById('ratioText').textContent =
+        `찬성 ${Math.round(pPro)}% · 반대 ${Math.round(pCon)}% · 중립 ${Math.round(pNeutral)}%`;
+    } else {
+      ['pbPro','pbCon','pbNeutral'].forEach(id => {
+        document.getElementById(id).style.width = '0%';
+      });
+      document.getElementById('ratioText').textContent = '아직 제출된 의견이 없습니다';
+    }
+  }
+
+  function setFilter(btn) {
+    currentFilter = btn.dataset.f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderOpinions();
+  }
+
+  function renderOpinions() {
+    const listEl = document.getElementById('opinionsList');
+    const list   = currentFilter === '전체'
+      ? allOpinions
+      : allOpinions.filter(o => o.stance === currentFilter);
+
+    if (list.length === 0) {
+      listEl.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">📭</div>
+          <p>${currentFilter === '전체' ? '아직 제출된 의견이 없어요' : currentFilter + ' 의견이 없어요'}</p>
+        </div>`;
+      return;
+    }
+
+    listEl.innerHTML = list.map(o => {
+      const cls    = o.stance === '찬성' ? 'pro' : o.stance === '반대' ? 'con' : 'neutral';
+      const labels = LABELS[o.school_level] || LABELS['중등'];
+      const time   = new Date(o.created_at).toLocaleString('ko-KR', {
+        month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+
+      const fields = [
+        { lbl: labels.reason,   val: o.reason   },
+        { lbl: labels.evidence, val: o.evidence },
+        { lbl: labels.counter,  val: o.counter  },
+        { lbl: labels.learned,  val: o.learned  },
+      ].filter(f => f.val);
+
+      return `
+        <div class="opinion-card ${cls}">
+          <div class="opinion-head">
+            <span class="opinion-name">👤 ${esc(o.student_name)}</span>
+            <span class="stance-badge ${cls}">${o.stance}</span>
+          </div>
+          <div class="opinion-topic">📌 ${esc(o.topic)}</div>
+          ${fields.map(f => `
+            <div class="ofield">
+              <div class="ofield-label">${f.lbl}</div>
+              <div class="ofield-value">${esc(f.val)}</div>
+            </div>`).join('')}
+          <div class="opinion-time">🕐 ${time}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // XSS 방지용 HTML 이스케이프
+  function esc(str) {
+    if (!str) return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ────────────────────────────────────────
+  // 초기화 — 중등 기본값 적용
+  // ────────────────────────────────────────
+  selectLevel('중등');
+</script>
+</body>
+</html>
